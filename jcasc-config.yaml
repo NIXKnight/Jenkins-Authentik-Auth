@@ -1,0 +1,72 @@
+jenkins:
+  agentProtocols:
+    - "JNLP4-connect"
+    - "Ping"
+  authorizationStrategy:
+    globalMatrix:
+      entries:
+        - group:
+            name: "JenkinsAdmin"
+            permissions:
+              - "Agent/Build"
+              - "Agent/Configure"
+              - "Agent/Connect"
+              - "Agent/Create"
+              - "Agent/Delete"
+              - "Agent/Disconnect"
+              - "Credentials/Create"
+              - "Credentials/Delete"
+              - "Credentials/ManageDomains"
+              - "Credentials/Update"
+              - "Credentials/View"
+              - "Job/Build"
+              - "Job/Cancel"
+              - "Job/Configure"
+              - "Job/Create"
+              - "Job/Delete"
+              - "Job/Discover"
+              - "Job/Move"
+              - "Job/Read"
+              - "Job/Workspace"
+              - "Overall/Administer"
+              - "Overall/Read"
+              - "Run/Delete"
+              - "Run/Replay"
+              - "Run/Update"
+              - "SCM/Tag"
+              - "View/Configure"
+              - "View/Create"
+              - "View/Delete"
+              - "View/Read"
+  clouds:
+    - docker:
+        name: "Docker Host"
+        dockerApi:
+          readTimeout: 60
+          connectTimeout: 60
+          dockerHost:
+            uri: "unix:///var/run/docker.sock"
+  securityRealm:
+    oic:
+      automanualconfigure: "auto"
+      wellKnownOpenIDConfigurationUrl: "http://authentik-server:9000/application/o/jenkins/.well-known/openid-configuration"
+      clientId: "jenkins"
+      clientSecret: "oRmazcqvIMPLKSbvSMdxKw1oYyyhkUEnA2IIhUxCuMjAI8tSu2Pqvg7uVoV0NlrsMx1EvA3Ca7nIef5qc4tOEM0827oKjQIJBx1DyQJWywuGg4h3fWL2xvuMoi4E7PKr"
+      disableSslVerification: true
+      emailFieldName: "email"
+      fullNameFieldName: "name"
+      groupsFieldName: "groups"
+      userNameField: "preferred_username"
+      scopes: "openid profile email"
+appearance:
+  prism:
+    theme: PRISM
+  themeManager:
+    disableUserThemes: false
+    theme: "dark"
+jobs:
+  - script: |
+      folder('SeedJobs') {
+        displayName('Seed Jobs')
+        description('This folder is generated using JCasC plugin. This folder is exists for seed jobs.')
+      }

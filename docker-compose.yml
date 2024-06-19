@@ -1,0 +1,94 @@
+services:
+  # Init container that installs required plugins before starting the main container
+  jenkins-init:
+    image: "jenkins/jenkins:2.440.3-lts-jdk17"
+    command: jenkins-plugin-cli --plugin-file /tmp/plugins.txt --verbose
+    environment:
+      PLUGIN_DIR: "/var/jenkins_home/plugins"
+    volumes:
+      - "jenkins_data:/var/jenkins_home"
+      - "./plugins.txt:/tmp/plugins.txt"
+  jenkins:
+    image: "jenkins/jenkins:2.440.3-lts-jdk17"
+    environment:
+      JAVA_OPTS: "-Xms2048m -Xmx2048m -Djenkins.install.runSetupWizard=false -Djava.net.preferIPv4Stack=true -Dcasc.jenkins.config=/var/jenkins_home/casc_configs"
+    # Added group so that Jenkins can communicate with host Docker daemon through Docker socket
+    group_add:
+      - "995"
+    ports:
+      - "8080:8080"
+    volumes:
+      - "jenkins_data:/var/jenkins_home"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./jcasc-config.yaml:/var/jenkins_home/casc_configs/jcasc-config.yaml"
+    depends_on:
+      jenkins-init:
+        condition: service_completed_successfully
+  redis:
+    image: docker.io/library/redis:alpine
+    command: --save 60 1 --loglevel warning
+    volumes:
+      - "redis_data:/data"
+  postgresql:
+    image: docker.io/library/postgres:12-alpine
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: "password"
+      POSTGRES_USER: "master"
+      POSTGRES_DB: "authentik"
+    ports:
+      - "5432:5432"
+  authentik-server:
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2024.2.1}
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_SECRET_KEY: "HKq9btPrwTgss4MmwPXRHKRr3t3pT9HR"
+      AUTHENTIK_POSTGRESQL__HOST: "postgresql"
+      AUTHENTIK_POSTGRESQL__USER: "master"
+      AUTHENTIK_POSTGRESQL__NAME: "authentik"
+      AUTHENTIK_POSTGRESQL__PASSWORD: "password"
+    volumes:
+      - ./media:/media
+      - ./custom-templates:/templates
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    depends_on:
+      - postgresql
+      - redis
+  authentik-worker:
+    image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2024.2.1}
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_SECRET_KEY: "HKq9btPrwTgss4MmwPXRHKRr3t3pT9HR"
+      AUTHENTIK_POSTGRESQL__HOST: "postgresql"
+      AUTHENTIK_POSTGRESQL__USER: "master"
+      AUTHENTIK_POSTGRESQL__NAME: "authentik"
+      AUTHENTIK_POSTGRESQL__PASSWORD: "password"
+    # `user: root` and the docker socket volume are optional.
+    # See more for the docker socket integration here:
+    # https://goauthentik.io/docs/outposts/integrations/docker
+    # Removing `user: root` also prevents the worker from fixing the permissions
+    # on the mounted folders, so when removing this make sure the folders have the correct UID/GID
+    # (1000:1000 by default)
+    user: root
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./media:/media
+      - ./certs:/certs
+      - ./custom-templates:/templates
+    depends_on:
+      - postgresql
+      - redis
+volumes:
+  jenkins_data:
+    driver: local
+  redis_data:
+    driver: local
+  postgresql_data:
+    driver: local
